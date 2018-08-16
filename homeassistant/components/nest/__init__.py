@@ -16,6 +16,7 @@ from homeassistant.const import (
     CONF_STRUCTURE, CONF_FILENAME, CONF_BINARY_SENSORS, CONF_SENSORS,
     CONF_MONITORED_CONDITIONS,
     EVENT_HOMEASSISTANT_START, EVENT_HOMEASSISTANT_STOP)
+from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send, \
     async_dispatcher_connect
@@ -167,16 +168,17 @@ async def async_setup_entry(hass, entry):
     hass.services.async_register(
         DOMAIN, 'set_mode', set_mode, schema=AWAY_SCHEMA)
 
+    @callback
     def start_up(event):
         """Start Nest update event listener."""
-        hass.async_add_job(async_nest_update_event_broker, hass, nest)
+        hass.async_create_task(async_nest_update_event_broker(hass, nest))
 
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_START, start_up)
 
+    @callback
     def shut_down(event):
         """Stop Nest update event listener."""
-        if nest:
-            nest.update_event.set()
+        nest.update_event.set()
 
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, shut_down)
 
