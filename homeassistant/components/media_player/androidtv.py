@@ -43,7 +43,7 @@ from homeassistant.exceptions import PlatformNotReady
 from homeassistant.helpers import device_registry as dr
 import homeassistant.helpers.config_validation as cv
 
-REQUIREMENTS = ['androidtv==0.0.4']
+REQUIREMENTS = ['androidtv==0.0.6']
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -250,55 +250,27 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
 
 
 def adb_decorator(override_available=False):
-    """Send an ADB command if the device is available and not locked."""
-    def adb_wrapper(func):
+    """Send an ADB command if the device is available and catch exceptions."""
+    def _adb_decorator(func):
         """Wait if previous ADB commands haven't finished."""
         @functools.wraps(func)
-        def _adb_wrapper(self, *args, **kwargs):
+        def __adb_decorator(self, *args, **kwargs):
             # If the device is unavailable, don't do anything
             if not self.available and not override_available:
                 return None
 
-            # "python-adb"
-            if not self.androidtv.adb_server_ip:
-                # If an ADB command is already running, skip this command
-                if not self.adb_lock.acquire(blocking=False):
-                    _LOGGER.info('Skipping an ADB command because a previous '
-                                 'command is still running')
-                    return None
+            try:
+                return func(self, *args, **kwargs)
+            except self.exceptions as err:
+                _LOGGER.error(
+                    "Failed to execute an ADB command. ADB connection re-"
+                    "establishing attempt in the next update. Error: %s", err)
+                self._available = False  # pylint: disable=protected-access
+                return None
 
-                # More ADB commands will be prevented while trying this one
-                try:
-                    returns = func(self, *args, **kwargs)
-                except self.exceptions:
-                    _LOGGER.error('Failed to execute an ADB command;'
-                                  ' will attempt to re-establish the ADB'
-                                  ' connection in the next update')
-                    returns = None
-                    _LOGGER.warning(
-                        "Device %s became unavailable.", self._name)
-                    self._available = False  # pylint: disable=protected-access
-                finally:
-                    self.adb_lock.release()
+        return __adb_decorator
 
-            # "pure-python-adb"
-            else:
-                try:
-                    returns = func(self, *args, **kwargs)
-                except self.exceptions:
-                    _LOGGER.error('Failed to execute an ADB command;'
-                                  ' will attempt to re-establish the ADB'
-                                  ' connection in the next update')
-                    returns = None
-                    _LOGGER.warning(
-                        "Device %s became unavailable.", self._name)
-                    self._available = False  # pylint: disable=protected-access
-
-            return returns
-
-        return _adb_wrapper
-
-    return adb_wrapper
+    return _adb_decorator
 
 
 class AndroidTVDevice(MediaPlayerDevice):
