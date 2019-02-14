@@ -27,7 +27,6 @@ https://home-assistant.io/components/media_player.androidtv/
 import logging
 import functools
 import os
-import threading
 import voluptuous as vol
 
 from homeassistant.components.media_player import (
