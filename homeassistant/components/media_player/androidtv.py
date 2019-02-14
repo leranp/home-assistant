@@ -291,9 +291,6 @@ class AndroidTVDevice(MediaPlayerDevice):
         self._unique_id = 'androitv-{}-{}'.format(
             name, self._properties['serialno'])
 
-        # whether or not the ADB connection is currently in use
-        self.adb_lock = threading.Lock()
-
         # ADB exceptions to catch
         if not self.androidtv.adb_server_ip:
             # "python-adb"
